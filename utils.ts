@@ -35,6 +35,8 @@ export const parseAnkiExport = (text: string): Card[] => {
         box: 0,
         lastReviewed: null,
         dueDate: Date.now(),
+        bucket: 'neutral',
+        isBookmarked: false,
       });
     }
   }

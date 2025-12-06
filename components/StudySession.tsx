@@ -1,64 +1,110 @@
 import React, { useState, useEffect } from 'react';
-import { Card } from '../types';
-import { ArrowLeft, Check, X, RotateCw } from 'lucide-react';
+import { Card, StudyMode } from '../types';
+import { ArrowLeft, Check, X, RotateCw, Edit2, Bookmark, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface StudySessionProps {
   cards: Card[];
+  mode: StudyMode;
+  initialIndex?: number;
   onComplete: (results: { cardId: string; success: boolean }[]) => void;
+  onUpdateCard: (card: Card) => void;
+  onCardViewed: (cardId: string) => void;
   onExit: () => void;
 }
 
-const StudySession: React.FC<StudySessionProps> = ({ cards, onComplete, onExit }) => {
-  const [queue, setQueue] = useState<Card[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+const StudySession: React.FC<StudySessionProps> = ({ cards, mode, initialIndex = 0, onComplete, onUpdateCard, onCardViewed, onExit }) => {
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isFlipped, setIsFlipped] = useState(false);
-  const [results, setResults] = useState<{ cardId: string; success: boolean }[]>([]);
   const [sessionComplete, setSessionComplete] = useState(false);
 
-  // Shuffle and init queue on mount
+  // Reset index when mode changes
   useEffect(() => {
-    const shuffled = [...cards].sort(() => Math.random() - 0.5);
-    setQueue(shuffled);
-  }, [cards]);
+    setCurrentIndex(initialIndex);
+    setIsFlipped(false);
+    setSessionComplete(false);
+  }, [mode]);
 
-  const currentCard = queue[currentIndex];
+  // Report viewed card
+  useEffect(() => {
+    if (cards[currentIndex]) {
+        onCardViewed(cards[currentIndex].id);
+    }
+  }, [currentIndex, cards, onCardViewed]);
+
+  const currentCard = cards[currentIndex];
 
   const handleFlip = () => {
     setIsFlipped(true);
   };
 
-  const handleResult = (success: boolean) => {
-    // Record result
-    setResults(prev => [...prev, { cardId: currentCard.id, success }]);
-    
-    // Animate out
-    setTimeout(() => {
-      if (currentIndex < queue.length - 1) {
-        setIsFlipped(false);
-        setCurrentIndex(prev => prev + 1);
-      } else {
-        setSessionComplete(true);
-      }
-    }, 150); // Short delay for button feedback
+  const handleBucket = (bucket: 'got-it' | 'missed-it') => {
+    if (!currentCard) return;
+
+    // Update the card immediately
+    const updatedCard = { ...currentCard, bucket };
+    onUpdateCard(updatedCard);
+
+    // Determine if we should advance
+    // If the card leaves the current view, the next card will slide into the current index,
+    // so we shouldn't increment the index.
+    let shouldAdvance = true;
+    if (mode === StudyMode.GOT_IT && bucket !== 'got-it') shouldAdvance = false;
+    if (mode === StudyMode.MISSED_IT && bucket !== 'missed-it') shouldAdvance = false;
+
+    if (shouldAdvance) {
+        handleNext();
+    }
   };
 
-  const finishSession = () => {
-    onComplete(results);
+  const handleNext = () => {
+    if (currentIndex < cards.length - 1) {
+      setIsFlipped(false);
+      setCurrentIndex(prev => prev + 1);
+    } else {
+      setSessionComplete(true);
+    }
   };
 
-  if (queue.length === 0 && !sessionComplete) {
+  const handlePrevious = () => {
+    if (currentIndex > 0) {
+      setIsFlipped(false);
+      setCurrentIndex(prev => prev - 1);
+    }
+  };
+
+  const handleEdit = () => {
+    if (!currentCard) return;
+    const newFront = window.prompt("Edit Front:", currentCard.front);
+    if (newFront === null) return;
+    const newBack = window.prompt("Edit Back:", currentCard.back);
+    if (newBack === null) return;
+
+    onUpdateCard({ ...currentCard, front: newFront, back: newBack });
+  };
+
+  const handleBookmark = () => {
+    if (!currentCard) return;
+    onUpdateCard({ ...currentCard, isBookmarked: !currentCard.isBookmarked });
+  };
+
+  if (cards.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full">
-        <div className="animate-spin text-stone-400 mb-4">
+        <div className="text-stone-400 mb-4">
           <RotateCw size={32} />
         </div>
-        <p className="text-stone-500">Preparing deck...</p>
+        <p className="text-stone-500">No cards in this view.</p>
+        <button 
+          onClick={onExit}
+          className="mt-4 text-indigo-600 hover:underline"
+        >
+          Return to Dashboard
+        </button>
       </div>
     );
   }
 
   if (sessionComplete) {
-    const correctCount = results.filter(r => r.success).length;
     return (
       <div className="flex flex-col items-center justify-center h-full animate-in fade-in zoom-in duration-500">
         <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6">
@@ -66,22 +112,11 @@ const StudySession: React.FC<StudySessionProps> = ({ cards, onComplete, onExit }
         </div>
         <h2 className="text-3xl font-serif font-medium text-ink mb-2">Session Complete</h2>
         <p className="text-stone-500 mb-8">
-          You reviewed <span className="font-semibold text-ink">{queue.length}</span> cards.
+          You reached the end of the list.
         </p>
         
-        <div className="grid grid-cols-2 gap-4 w-full max-w-xs mb-8">
-            <div className="bg-white p-4 rounded-xl border border-stone-100 shadow-sm text-center">
-                <div className="text-2xl font-bold text-green-600">{correctCount}</div>
-                <div className="text-xs text-stone-400 uppercase tracking-wider font-semibold">Remembered</div>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-stone-100 shadow-sm text-center">
-                <div className="text-2xl font-bold text-orange-500">{queue.length - correctCount}</div>
-                <div className="text-xs text-stone-400 uppercase tracking-wider font-semibold">Learning</div>
-            </div>
-        </div>
-
         <button 
-          onClick={finishSession}
+          onClick={onExit}
           className="bg-ink text-white px-8 py-3 rounded-full font-medium hover:bg-stone-800 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
         >
           Return to Dashboard
@@ -91,7 +126,7 @@ const StudySession: React.FC<StudySessionProps> = ({ cards, onComplete, onExit }
   }
 
   // Calculate progress
-  const progress = ((currentIndex) / queue.length) * 100;
+  const progress = ((currentIndex) / cards.length) * 100;
 
   return (
     <div className="flex flex-col h-full max-w-4xl mx-auto relative">
@@ -110,7 +145,7 @@ const StudySession: React.FC<StudySessionProps> = ({ cards, onComplete, onExit }
             />
         </div>
         <div className="text-sm font-medium text-stone-400 tabular-nums">
-            {currentIndex + 1} / {queue.length}
+            {currentIndex + 1} / {cards.length}
         </div>
       </div>
 
@@ -119,6 +154,24 @@ const StudySession: React.FC<StudySessionProps> = ({ cards, onComplete, onExit }
         <div 
           className="w-full max-w-2xl bg-white rounded-2xl shadow-sm border border-stone-200 min-h-[400px] flex flex-col relative overflow-hidden transition-all duration-500"
         >
+           {/* Toolbar */}
+           <div className="absolute top-4 right-4 z-20 flex gap-2">
+              <button 
+                onClick={handleBookmark}
+                className={`p-2 rounded-full transition-colors ${currentCard.isBookmarked ? 'text-yellow-500 bg-yellow-50' : 'text-stone-300 hover:text-stone-500 hover:bg-stone-100'}`}
+                title="Bookmark"
+              >
+                <Bookmark size={20} fill={currentCard.isBookmarked ? "currentColor" : "none"} />
+              </button>
+              <button 
+                onClick={handleEdit}
+                className="p-2 text-stone-300 hover:text-stone-500 hover:bg-stone-100 rounded-full transition-colors"
+                title="Edit Card"
+              >
+                <Edit2 size={20} />
+              </button>
+           </div>
+
            {/* Front */}
            <div className="flex-1 p-10 flex flex-col items-center justify-center text-center overflow-y-auto no-scrollbar">
                 <span className="absolute top-6 left-6 text-xs font-bold tracking-widest text-stone-300 uppercase">Question</span>
@@ -138,6 +191,24 @@ const StudySession: React.FC<StudySessionProps> = ({ cards, onComplete, onExit }
                </div>
            )}
         </div>
+        
+        {/* Navigation Arrows (Desktop) */}
+        <button 
+            onClick={handlePrevious}
+            disabled={currentIndex === 0}
+            className={`absolute left-0 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white shadow-md border border-stone-100 transition-all
+                ${currentIndex === 0 ? 'opacity-0 pointer-events-none' : 'opacity-100 hover:bg-stone-50 text-stone-500'}`}
+        >
+            <ChevronLeft size={24} />
+        </button>
+        <button 
+            onClick={handleNext}
+            disabled={currentIndex === cards.length - 1}
+            className={`absolute right-0 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white shadow-md border border-stone-100 transition-all
+                ${currentIndex === cards.length - 1 ? 'opacity-0 pointer-events-none' : 'opacity-100 hover:bg-stone-50 text-stone-500'}`}
+        >
+            <ChevronRight size={24} />
+        </button>
       </div>
 
       {/* Controls */}
@@ -152,18 +223,24 @@ const StudySession: React.FC<StudySessionProps> = ({ cards, onComplete, onExit }
         ) : (
             <div className="flex gap-4 w-full max-w-lg animate-in zoom-in-95 duration-200">
                 <button 
-                    onClick={() => handleResult(false)}
-                    className="flex-1 flex flex-col items-center justify-center py-4 px-6 bg-white border border-stone-200 rounded-xl hover:border-orange-200 hover:bg-orange-50 group transition-all"
+                    onClick={() => handleBucket('missed-it')}
+                    className={`flex-1 flex flex-col items-center justify-center py-4 px-6 border rounded-xl transition-all group
+                        ${currentCard.bucket === 'missed-it' 
+                            ? 'bg-orange-100 border-orange-300 ring-2 ring-orange-200' 
+                            : 'bg-white border-stone-200 hover:border-orange-200 hover:bg-orange-50'}`}
                 >
-                    <X className="mb-1 text-stone-400 group-hover:text-orange-500 transition-colors" size={24} />
-                    <span className="text-sm font-semibold text-stone-600 group-hover:text-orange-700">Missed it</span>
+                    <X className={`mb-1 transition-colors ${currentCard.bucket === 'missed-it' ? 'text-orange-600' : 'text-stone-400 group-hover:text-orange-500'}`} size={24} />
+                    <span className={`text-sm font-semibold ${currentCard.bucket === 'missed-it' ? 'text-orange-700' : 'text-stone-600 group-hover:text-orange-700'}`}>Missed it</span>
                 </button>
                 <button 
-                    onClick={() => handleResult(true)}
-                    className="flex-1 flex flex-col items-center justify-center py-4 px-6 bg-white border border-stone-200 rounded-xl hover:border-green-200 hover:bg-green-50 group transition-all"
+                    onClick={() => handleBucket('got-it')}
+                    className={`flex-1 flex flex-col items-center justify-center py-4 px-6 border rounded-xl transition-all group
+                        ${currentCard.bucket === 'got-it' 
+                            ? 'bg-green-100 border-green-300 ring-2 ring-green-200' 
+                            : 'bg-white border-stone-200 hover:border-green-200 hover:bg-green-50'}`}
                 >
-                    <Check className="mb-1 text-stone-400 group-hover:text-green-500 transition-colors" size={24} />
-                    <span className="text-sm font-semibold text-stone-600 group-hover:text-green-700">Got it</span>
+                    <Check className={`mb-1 transition-colors ${currentCard.bucket === 'got-it' ? 'text-green-600' : 'text-stone-400 group-hover:text-green-500'}`} size={24} />
+                    <span className={`text-sm font-semibold ${currentCard.bucket === 'got-it' ? 'text-green-700' : 'text-stone-600 group-hover:text-green-700'}`}>Got it</span>
                 </button>
             </div>
         )}
