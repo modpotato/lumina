@@ -9,25 +9,29 @@ interface StudySessionProps {
   onComplete: (results: { cardId: string; success: boolean }[]) => void;
   onUpdateCard: (card: Card) => void;
   onCardViewed: (cardId: string) => void;
+  onReview: (cardId: string, result: 'correct' | 'incorrect', timeSpent: number) => void;
   onExit: () => void;
 }
 
-const StudySession: React.FC<StudySessionProps> = ({ cards, mode, initialIndex = 0, onComplete, onUpdateCard, onCardViewed, onExit }) => {
+const StudySession: React.FC<StudySessionProps> = ({ cards, mode, initialIndex = 0, onComplete, onUpdateCard, onCardViewed, onReview, onExit }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isFlipped, setIsFlipped] = useState(false);
   const [sessionComplete, setSessionComplete] = useState(false);
+  const [startTime, setStartTime] = useState(Date.now());
 
   // Reset index when mode changes
   useEffect(() => {
     setCurrentIndex(initialIndex);
     setIsFlipped(false);
     setSessionComplete(false);
+    setStartTime(Date.now());
   }, [mode]);
 
-  // Report viewed card
+  // Report viewed card and reset timer
   useEffect(() => {
     if (cards[currentIndex]) {
         onCardViewed(cards[currentIndex].id);
+        setStartTime(Date.now());
     }
   }, [currentIndex, cards, onCardViewed]);
 
@@ -39,6 +43,11 @@ const StudySession: React.FC<StudySessionProps> = ({ cards, mode, initialIndex =
 
   const handleBucket = (bucket: 'got-it' | 'missed-it') => {
     if (!currentCard) return;
+
+    const timeSpent = Date.now() - startTime;
+
+    // Log review
+    onReview(currentCard.id, bucket === 'got-it' ? 'correct' : 'incorrect', timeSpent);
 
     // Update the card immediately
     const updatedCard = { ...currentCard, bucket };

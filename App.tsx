@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, AppState, DeckStats, StudyMode } from './types';
+import { Card, AppState, DeckStats, StudyMode, ReviewLog, DailyStats } from './types';
 import { calculateNextReview, getDueCards, generateId } from './utils';
 import Dashboard from './components/Dashboard';
 import ImportScreen from './components/ImportScreen';
@@ -7,9 +7,12 @@ import StudySession from './components/StudySession';
 
 const STORAGE_KEY = 'lumina_cards_v1';
 const LAST_VIEWED_KEY = 'lumina_last_viewed_v1';
+const STATS_KEY = 'lumina_stats_v1';
 
 const App: React.FC = () => {
   const [cards, setCards] = useState<Card[]>([]);
+  const [reviewLogs, setReviewLogs] = useState<ReviewLog[]>([]);
+  const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
   const [appState, setAppState] = useState<AppState>(AppState.HOME);
   const [studyMode, setStudyMode] = useState<StudyMode>(StudyMode.MASTER);
   const [lastViewedCardId, setLastViewedCardId] = useState<string | null>(null);
@@ -38,6 +41,17 @@ const App: React.FC = () => {
         setLastViewedCardId(storedLastViewed);
     }
 
+    const storedStats = localStorage.getItem(STATS_KEY);
+    if (storedStats) {
+        try {
+            const parsedStats = JSON.parse(storedStats);
+            setReviewLogs(parsedStats.logs || []);
+            setDailyStats(parsedStats.daily || []);
+        } catch (e) {
+            console.error("Failed to load stats", e);
+        }
+    }
+
     setIsLoading(false);
   }, []);
 
@@ -47,6 +61,13 @@ const App: React.FC = () => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(cards));
     }
   }, [cards, isLoading]);
+
+  // Save stats
+  useEffect(() => {
+    if (!isLoading) {
+        localStorage.setItem(STATS_KEY, JSON.stringify({ logs: reviewLogs, daily: dailyStats }));
+    }
+  }, [reviewLogs, dailyStats, isLoading]);
 
   // Save last viewed
   useEffect(() => {
@@ -63,9 +84,12 @@ const App: React.FC = () => {
   const handleClear = () => {
     if (window.confirm("Are you sure you want to delete all cards and progress? This cannot be undone.")) {
       setCards([]);
+      setReviewLogs([]);
+      setDailyStats([]);
       setLastViewedCardId(null);
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(LAST_VIEWED_KEY);
+      localStorage.removeItem(STATS_KEY);
     }
   };
 
@@ -80,6 +104,7 @@ const App: React.FC = () => {
       })));
       setLastViewedCardId(null);
       localStorage.removeItem(LAST_VIEWED_KEY);
+      // We probably want to keep stats history even if we reset card progress
     }
   };
 
@@ -100,6 +125,49 @@ const App: React.FC = () => {
 
   const handleUpdateCard = (updatedCard: Card) => {
     setCards(prev => prev.map(c => c.id === updatedCard.id ? updatedCard : c));
+  };
+
+  const handleReview = (cardId: string, result: 'correct' | 'incorrect', timeSpent: number) => {
+    const now = Date.now();
+    const today = new Date().toISOString().split('T')[0];
+    const card = cards.find(c => c.id === cardId);
+    
+    if (!card) return;
+
+    // Log review
+    const newLog: ReviewLog = {
+        id: generateId(),
+        cardId,
+        timestamp: now,
+        result,
+        previousBox: card.box,
+        newBox: result === 'correct' ? Math.min(card.box + 1, 5) : 0, // Simplified logic, actual logic is in calculateNextReview but we just want to log here
+        timeSpent
+    };
+
+    setReviewLogs(prev => [...prev, newLog]);
+
+    // Update daily stats
+    setDailyStats(prev => {
+        const existing = prev.find(d => d.date === today);
+        if (existing) {
+            return prev.map(d => d.date === today ? {
+                ...d,
+                count: d.count + 1,
+                correct: d.correct + (result === 'correct' ? 1 : 0),
+                incorrect: d.incorrect + (result === 'incorrect' ? 1 : 0),
+                timeSpent: (d.timeSpent || 0) + timeSpent
+            } : d);
+        } else {
+            return [...prev, {
+                date: today,
+                count: 1,
+                correct: result === 'correct' ? 1 : 0,
+                incorrect: result === 'incorrect' ? 1 : 0,
+                timeSpent
+            }];
+        }
+    });
   };
 
   const handleStudyComplete = (results: { cardId: string; success: boolean }[]) => {
@@ -133,13 +201,55 @@ const App: React.FC = () => {
     const gotIt = cards.filter(c => c.bucket === 'got-it').length;
     const missedIt = cards.filter(c => c.bucket === 'missed-it').length;
     
+    // Calculate detailed stats
+    const totalReviews = reviewLogs.length;
+    const correctReviews = reviewLogs.filter(l => l.result === 'correct').length;
+    const accuracy = totalReviews > 0 ? Math.round((correctReviews / totalReviews) * 100) : 0;
+    
+    const today = new Date().toISOString().split('T')[0];
+    const todayStats = dailyStats.find(d => d.date === today);
+    const todayCount = todayStats ? todayStats.count : 0;
+    const todayTime = todayStats ? (todayStats.timeSpent || 0) : 0;
+    const totalTime = dailyStats.reduce((acc, curr) => acc + (curr.timeSpent || 0), 0);
+
+    // Calculate streak
+    let streak = 0;
+    const sortedDates = [...dailyStats].sort((a, b) => b.date.localeCompare(a.date));
+    
+    // Check if we studied today
+    let currentDate = new Date();
+    let dateStr = currentDate.toISOString().split('T')[0];
+    
+    // If no study today, check yesterday for streak continuation
+    if (!dailyStats.find(d => d.date === dateStr)) {
+        currentDate.setDate(currentDate.getDate() - 1);
+        dateStr = currentDate.toISOString().split('T')[0];
+    }
+
+    while (true) {
+        const hasStudy = dailyStats.find(d => d.date === dateStr && d.count > 0);
+        if (hasStudy) {
+            streak++;
+            currentDate.setDate(currentDate.getDate() - 1);
+            dateStr = currentDate.toISOString().split('T')[0];
+        } else {
+            break;
+        }
+    }
+
     return {
       total: cards.length,
       due,
       mastered,
       learning,
       gotIt,
-      missedIt
+      missedIt,
+      streak,
+      accuracy,
+      totalReviews,
+      todayCount,
+      totalTime,
+      todayTime
     };
   };
 
@@ -187,6 +297,7 @@ const App: React.FC = () => {
             onComplete={handleStudyComplete} 
             onUpdateCard={handleUpdateCard}
             onCardViewed={setLastViewedCardId}
+            onReview={handleReview}
             onExit={() => setAppState(AppState.HOME)} 
           />
         );

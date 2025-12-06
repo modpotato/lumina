@@ -1,6 +1,16 @@
 import React from 'react';
 import { Card, DeckStats, StudyMode } from '../types';
-import { Play, Plus, Trash2, Library, BookOpen, CheckCircle, XCircle, RotateCcw } from 'lucide-react';
+import { Play, Plus, Trash2, Library, BookOpen, CheckCircle, XCircle, RotateCcw, Flame, Target, BarChart2, Calendar, Clock, Hourglass } from 'lucide-react';
+
+const formatTime = (ms: number) => {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  
+  if (hours > 0) return `${hours}h ${minutes % 60}m`;
+  if (minutes > 0) return `${minutes}m`;
+  return `${seconds}s`;
+};
 
 interface DashboardProps {
   cards: Card[];
@@ -189,6 +199,52 @@ const Dashboard: React.FC<DashboardProps> = ({ cards, stats, onStartStudy, onImp
                     />
                 </div>
              </div>
+          </div>
+
+          {/* Detailed Stats Row */}
+          <div className="md:col-span-3 grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-stone-100 shadow-sm flex flex-col items-center text-center">
+                <div className="bg-orange-50 text-orange-500 p-3 rounded-full mb-3">
+                    <Flame size={20} />
+                </div>
+                <div className="text-2xl font-bold text-stone-800">{stats.streak}</div>
+                <div className="text-xs text-stone-400 uppercase tracking-wider font-semibold">Day Streak</div>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-stone-100 shadow-sm flex flex-col items-center text-center">
+                <div className="bg-blue-50 text-blue-500 p-3 rounded-full mb-3">
+                    <Calendar size={20} />
+                </div>
+                <div className="text-2xl font-bold text-stone-800">{stats.todayCount}</div>
+                <div className="text-xs text-stone-400 uppercase tracking-wider font-semibold">Reviews Today</div>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-stone-100 shadow-sm flex flex-col items-center text-center">
+                <div className="bg-teal-50 text-teal-500 p-3 rounded-full mb-3">
+                    <Clock size={20} />
+                </div>
+                <div className="text-2xl font-bold text-stone-800">{formatTime(stats.todayTime || 0)}</div>
+                <div className="text-xs text-stone-400 uppercase tracking-wider font-semibold">Time Today</div>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-stone-100 shadow-sm flex flex-col items-center text-center">
+                <div className="bg-purple-50 text-purple-500 p-3 rounded-full mb-3">
+                    <Target size={20} />
+                </div>
+                <div className="text-2xl font-bold text-stone-800">{stats.accuracy}%</div>
+                <div className="text-xs text-stone-400 uppercase tracking-wider font-semibold">Accuracy</div>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-stone-100 shadow-sm flex flex-col items-center text-center">
+                <div className="bg-stone-50 text-stone-500 p-3 rounded-full mb-3">
+                    <BarChart2 size={20} />
+                </div>
+                <div className="text-2xl font-bold text-stone-800">{stats.totalReviews}</div>
+                <div className="text-xs text-stone-400 uppercase tracking-wider font-semibold">Total Reviews</div>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-stone-100 shadow-sm flex flex-col items-center text-center">
+                <div className="bg-indigo-50 text-indigo-500 p-3 rounded-full mb-3">
+                    <Hourglass size={20} />
+                </div>
+                <div className="text-2xl font-bold text-stone-800">{formatTime(stats.totalTime || 0)}</div>
+                <div className="text-xs text-stone-400 uppercase tracking-wider font-semibold">Total Time</div>
+            </div>
           </div>
         </div>
       )}
