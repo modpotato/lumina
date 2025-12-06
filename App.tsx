@@ -261,9 +261,6 @@ const App: React.FC = () => {
         return cards.filter(c => c.bucket === 'missed-it');
       case StudyMode.MASTER:
       default:
-        // Master view contains everything, but maybe we want to filter out 'got-it' if the user wants to focus?
-        // The user said "Master Review: A view containing everything mixed together".
-        // So we return all cards.
         return cards;
     }
   };
