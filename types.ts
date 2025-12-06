@@ -12,7 +12,6 @@ export interface Card {
 export enum AppState {
   HOME = 'HOME',
   STUDY = 'STUDY',
-  MANAGE = 'MANAGE',
   IMPORT = 'IMPORT'
 }
 

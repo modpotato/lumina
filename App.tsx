@@ -95,7 +95,7 @@ const App: React.FC = () => {
         const dueCards = getDueCards(cards);
         return (
           <StudySession 
-            cards={dueCards.length > 0 ? dueCards : cards} // Fallback to all cards if debugging/testing without dates
+            cards={dueCards}
             onComplete={handleStudyComplete} 
             onExit={() => setAppState(AppState.HOME)} 
           />

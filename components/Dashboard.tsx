@@ -89,8 +89,6 @@ const Dashboard: React.FC<DashboardProps> = ({ cards, stats, onStartStudy, onImp
                 </div>
             </div>
             
-            {/* Decor */}
-            <div className="absolute -right-12 -bottom-12 w-64 h-64 bg-stone-50 rounded-full opacity-50 group-hover:scale-110 transition-transform duration-700 ease-out" />
           </div>
 
           {/* Stats Column */}

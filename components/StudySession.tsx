@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '../types';
-import { ArrowLeft, Repeat, Check, X, RotateCw } from 'lucide-react';
+import { ArrowLeft, Check, X, RotateCw } from 'lucide-react';
 
 interface StudySessionProps {
   cards: Card[];
