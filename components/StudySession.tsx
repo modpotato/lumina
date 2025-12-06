@@ -13,7 +13,7 @@ interface StudySessionProps {
   onExit: () => void;
 }
 
-const StudySession: React.FC<StudySessionProps> = ({ cards, mode, initialIndex = 0, onComplete, onUpdateCard, onCardViewed, onReview, onExit }) => {
+const StudySession: React.FC<StudySessionProps> = ({ cards, mode, initialIndex = 0, onUpdateCard, onCardViewed, onReview, onExit }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isFlipped, setIsFlipped] = useState(false);
   const [sessionComplete, setSessionComplete] = useState(false);

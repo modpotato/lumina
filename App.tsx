@@ -214,7 +214,6 @@ const App: React.FC = () => {
 
     // Calculate streak
     let streak = 0;
-    const sortedDates = [...dailyStats].sort((a, b) => b.date.localeCompare(a.date));
     
     // Check if we studied today
     let currentDate = new Date();
